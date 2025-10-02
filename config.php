@@ -11,7 +11,7 @@
 $db_host = 'localhost';        // Máy chủ database (localhost = máy tính của bạn)
 $db_username = 'root';         // Tên đăng nhập MySQL
 $db_password = '';             // Mật khẩu MySQL (mặc định xampp là rỗng)
-$db_name = 'ql_drl';           // Tên database
+$db_name = 'conductscore_db';           // Tên database
 
 // 2. TẠO KẾT NỐI VỚI DATABASE
 try {

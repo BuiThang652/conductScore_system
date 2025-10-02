@@ -337,7 +337,7 @@ ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
     <!-- HEADER -->
     <header class="header">
         <div class="container">
-            <h1>🎓 Hệ thống quản lý điểm rèn luyện</h1>
+            <h1>Hệ thống quản lý điểm rèn luyện</h1>
             <div class="user-info">
                 <!-- User info và logout -->
             </div>

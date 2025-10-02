@@ -2,8 +2,26 @@
 /**
  * TRANG CHỦ - index.php
  * 
- * Đây là trang chính sau khi user đăng nhập thành công
- * Hiển thị menu và thông tin cơ bản
+ * Đây là trang chính sau khi user đăng nhập     <!--                <?php if ($user_role === 'student'): ?>
+                    <li><a href="students.php">📝 Tự đánh giá</a></li>
+                    <li><a href="evaluations.php">📊 Xem kết quả</a></li>
+                <?php else: ?>
+                    <li><a href="students.php">👨‍🎓 Quản lý sinh viên</a></li>
+                    <li><a href="evaluations.php">📊 Điểm rèn luyện</a></li>ĐIỀU HƯỚNG -->
+    <nav class="nav-menu">
+        <div class="container">
+            <ul class="menu-list">
+                <li><a href="index.php" class="active">🏠 Trang chủ</a></li>
+                <?php if ($user_role === 'student'): ?>
+                    <li><a href="students.php">📝 Tự đánh giá</a></li>
+                    <li><a href="evaluations.php">📊 Xem kết quả</a></li>
+                <?php else: ?>
+                    <li><a href="students.php">👨‍🎓 Quản lý sinh viên</a></li>
+                    <li><a href="evaluations.php">📊 Điểm rèn luyện</a></li>
+                    <?php if ($user_role === 'admin'): ?>
+                        <li><a href="admin.php">⚙️ Quản trị</a></li>
+                    <?php endif; ?>
+                <?php endif; ?>Hiển thị menu và thông tin cơ bản
  */
 
 // Bắt đầu session
@@ -68,20 +86,10 @@ try {
     <!-- HEADER -->
     <header class="header">
         <div class="container">
-            <h1>🎓 Hệ thống quản lý điểm rèn luyện</h1>
+            <h1>Hệ thống quản lý điểm rèn luyện</h1>
             <div class="user-info">
                 <span>Xin chào, <strong><?php echo htmlspecialchars($user_name); ?></strong></span>
-                <span class="role-badge role-<?php echo $user_role; ?>">
-                    <?php 
-                    switch($user_role) {
-                        case 'admin': echo '👑 Admin'; break;
-                        case 'lecturer': echo '👨‍🏫 Giảng viên'; break;
-                        case 'student': echo '👨‍🎓 Sinh viên'; break;
-                        default: echo $user_role;
-                    }
-                    ?>
-                </span>
-                <a href="?logout=1" class="btn-logout">🚪 Đăng xuất</a>
+                <a href="?logout=1" class="btn-logout">Đăng xuất</a>
             </div>
         </div>
     </header>
@@ -90,11 +98,16 @@ try {
     <nav class="nav-menu">
         <div class="container">
             <ul class="menu-list">
-                <li><a href="index.php" class="active">🏠 Trang chủ</a></li>
-                <li><a href="students.php">👨‍🎓 Sinh viên</a></li>
-                <li><a href="evaluations.php">📊 Điểm rèn luyện</a></li>
-                <?php if ($user_role == 'admin'): ?>
-                <li><a href="admin.php">⚙️ Quản trị</a></li>
+                <li><a href="index.php" class="active">Trang chủ</a></li>
+                <?php if ($user_role === 'student'): ?>
+                    <li><a href="students.php">Tự đánh giá</a></li>
+                    <li><a href="evaluations.php">Xem kết quả</a></li>
+                <?php else: ?>
+                    <li><a href="evaluations.php">Điểm rèn luyện</a></li>
+                    <li><a href="lecturer_evaluation.php">Đánh giá sinh viên</a></li>
+                    <?php if ($user_role === 'admin'): ?>
+                        <li><a href="admin.php">Quản trị</a></li>
+                    <?php endif; ?>
                 <?php endif; ?>
             </ul>
         </div>
@@ -106,25 +119,26 @@ try {
             
             <!-- THÔNG TIN USER -->
             <section class="welcome-section">
-                <h2>Chào mừng đến với hệ thống quản lý điểm rèn luyện! 👋</h2>
+                <h2>Chào mừng đến với hệ thống quản lý điểm rèn luyện!</h2>
                 <div class="user-details">
-                    <p><strong>📧 Email:</strong> <?php echo htmlspecialchars($user_email); ?></p>
-                    <p><strong>👤 Vai trò:</strong> 
+                    <p><strong>Email:</strong> <?php echo htmlspecialchars($user_email); ?></p>
+                    <p><strong>Vai trò:</strong> 
                         <?php 
                         switch($user_role) {
-                            case 'admin': echo 'Quản trị viên'; break;
+                            case 'admin': echo 'Quản trị viên hệ thống'; break;
                             case 'lecturer': echo 'Giảng viên'; break;
                             case 'student': echo 'Sinh viên'; break;
+                            default: echo ucfirst($user_role);
                         }
                         ?>
                     </p>
-                    <p><strong>🕐 Thời gian đăng nhập:</strong> <?php echo date('d/m/Y H:i:s'); ?></p>
+                    <p><strong>Thời gian đăng nhập:</strong> <?php echo date('d/m/Y H:i:s'); ?></p>
                 </div>
             </section>
 
             <!-- THỐNG KÊ TỔNG QUAN -->
             <section class="statistics-section">
-                <h3>📈 Thống kê tổng quan</h3>
+                <h3>Thống kê tổng quan</h3>
                 <div class="stats-grid">
                     <div class="stat-card">
                         <div class="stat-icon">👨‍🎓</div>
@@ -162,18 +176,18 @@ try {
 
             <!-- MENU CHỨC NĂNG -->
             <section class="features-section">
-                <h3>🚀 Chức năng chính</h3>
+                <h3>Chức năng chính</h3>
                 <div class="features-grid">
                     <a href="students.php" class="feature-card">
                         <div class="feature-icon">👨‍🎓</div>
-                        <h4>Quản lý sinh viên</h4>
-                        <p>Xem danh sách sinh viên, thông tin lớp học</p>
+                        <h4>Tự đánh giá</h4>
+                        <p>Thực hiện tự đánh giá bản thân</p>
                     </a>
                     
                     <a href="evaluations.php" class="feature-card">
                         <div class="feature-icon">📊</div>
-                        <h4>Điểm rèn luyện</h4>
-                        <p>Xem và nhập điểm rèn luyện cho sinh viên</p>
+                        <h4>Xem kết quả</h4>
+                        <p>Xem kết quả đánh giá của bản thân</p>
                     </a>
                     
                     <?php if ($user_role == 'admin'): ?>

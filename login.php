@@ -38,8 +38,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->execute([$email]);
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
             
-            // Kiểm tra password (tạm thời dùng plain text cho đơn giản)
-            if ($user && $password === $user['password']) {
+            // Kiểm tra password (sử dụng MD5)
+            if ($user && md5($password) === $user['password']) {
                 // Đăng nhập thành công - lưu thông tin vào session
                 $_SESSION['user_id'] = $user['id'];
                 $_SESSION['user_email'] = $user['email'];
@@ -70,26 +70,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 <body>
     <div class="login-container">
         <div class="login-box">
-            <h2>🎓 Hệ thống quản lý điểm rèn luyện</h2>
+            <h2>Hệ thống quản lý điểm rèn luyện</h2>
             <h3>Đăng nhập</h3>
             
             <!-- Hiển thị lỗi nếu có -->
             <?php if (!empty($error_message)): ?>
                 <div class="error-message">
-                    ❌ <?php echo $error_message; ?>
+                    <?php echo $error_message; ?>
                 </div>
             <?php endif; ?>
             
             <!-- FORM ĐĂNG NHẬP -->
             <form method="POST" action="">
                 <div class="form-group">
-                    <label for="email">📧 Email:</label>
+                    <label for="email">Email:</label>
                     <input type="email" id="email" name="email" required 
                            value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
                 </div>
                 
                 <div class="form-group">
-                    <label for="password">🔒 Mật khẩu:</label>
+                    <label for="password">Mật khẩu:</label>
                     <input type="password" id="password" name="password" required>
                 </div>
                 
@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             
             <!-- HƯỚNG DẪN TEST -->
             <div class="test-info">
-                <h4>🧪 Tài khoản test (cho học sinh):</h4>
+                <h4>Tài khoản test (cho học sinh):</h4>
                 <p><strong>Email:</strong> admin@test.com</p>
                 <p><strong>Mật khẩu:</strong> 123456</p>
                 <p><em>Lưu ý: Cần tạo tài khoản này trong database trước!</em></p>
