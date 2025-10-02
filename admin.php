@@ -93,6 +93,29 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $success_message = "Tạo người dùng thành công!";
                 break;
                 
+            case 'reset_password':
+                // Reset mật khẩu người dùng về mặc định
+                $user_id = (int)$_POST['user_id'];
+                $new_password = '123456'; // Mật khẩu mặc định
+                $hashed_password = password_hash($new_password, PASSWORD_DEFAULT);
+                
+                // Lấy thông tin user trước khi reset
+                $stmt = $pdo->prepare("SELECT email, full_name FROM users WHERE id = ?");
+                $stmt->execute([$user_id]);
+                $user_info = $stmt->fetch(PDO::FETCH_ASSOC);
+                
+                if (!$user_info) {
+                    throw new Exception('Không tìm thấy người dùng!');
+                }
+                
+                // Cập nhật mật khẩu mới
+                $stmt = $pdo->prepare("UPDATE users SET password = ?, updated_at = NOW() WHERE id = ?");
+                $stmt->execute([$hashed_password, $user_id]);
+                
+                $success_message = "🔑 Đã reset mật khẩu cho <strong>{$user_info['full_name']}</strong> ({$user_info['email']}) về: <code>{$new_password}</code><br>
+                                   <small>⚠️ Người dùng cần đăng nhập lại với mật khẩu mới.</small>";
+                break;
+                
             case 'update_user':
                 // Cập nhật người dùng
                 $user_id = (int)$_POST['user_id'];
@@ -1151,7 +1174,7 @@ try {
             <!-- THÔNG BÁO -->
             <?php if (!empty($success_message)): ?>
                 <div class="alert alert-success">
-                    ✅ <?php echo htmlspecialchars($success_message); ?>
+                    ✅ <?php echo $success_message; ?>
                 </div>
             <?php endif; ?>
             
@@ -1227,14 +1250,6 @@ try {
                 <section class="users-section">
                     <h3>👥 Quản lý người dùng</h3>
                     
-                    <div style="background: #e8f4fd; border: 1px solid #b8daff; border-radius: 3px; padding: 15px; margin-bottom: 20px;">
-                        <h5 style="margin: 0 0 10px 0; color: #004085;">💡 Hướng dẫn sử dụng</h5>
-                        <p style="margin: 0; color: #004085; font-size: 14px;">
-                            <strong>Bước 1:</strong> Tạo tài khoản người dùng ở đây với role "lecturer" hoặc "student"<br>
-                            <strong>Bước 2:</strong> Vào tab "🏫 Lớp học" để liên kết tài khoản với hồ sơ học tập và phân công lớp
-                        </p>
-                    </div>
-                    
                     <!-- FORM TẠO USER MỚI -->
                     <div class="admin-form">
                         <h4>➕ Tạo người dùng mới</h4>
@@ -1302,6 +1317,7 @@ try {
                                     <td><?php echo date('d/m/Y', strtotime($user['created_at'])); ?></td>
                                     <td>
                                         <button class="btn-small btn-edit" onclick="editUser(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['email'], ENT_QUOTES); ?>', '<?php echo htmlspecialchars($user['full_name'], ENT_QUOTES); ?>', '<?php echo $user['role']; ?>', <?php echo $user['is_active']; ?>)">✏️ Sửa</button>
+                                        <button class="btn-small" style="background-color: #f39c12; color: white;" onclick="resetPassword(<?php echo $user['id']; ?>, '<?php echo htmlspecialchars($user['full_name'], ENT_QUOTES); ?>')">🔑 Reset PW</button>
                                         <?php if ($user['id'] != $_SESSION['user_id']): ?>
                                         <button class="btn-small btn-delete" onclick="deleteUser(<?php echo $user['id']; ?>)">🗑️ Xóa</button>
                                         <?php endif; ?>
@@ -2064,6 +2080,30 @@ try {
                 actionInput.type = 'hidden';
                 actionInput.name = 'action';
                 actionInput.value = 'delete_user';
+                form.appendChild(actionInput);
+                
+                var userIdInput = document.createElement('input');
+                userIdInput.type = 'hidden';
+                userIdInput.name = 'user_id';
+                userIdInput.value = userId;
+                form.appendChild(userIdInput);
+                
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+        
+        function resetPassword(userId, userName) {
+            if (confirm('Bạn có chắc chắn muốn reset mật khẩu của "' + userName + '" về "123456"?\n\nLưu ý: Người dùng sẽ cần đăng nhập lại với mật khẩu mới.')) {
+                // Tạo form ẩn để submit reset password
+                var form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '';
+                
+                var actionInput = document.createElement('input');
+                actionInput.type = 'hidden';
+                actionInput.name = 'action';
+                actionInput.value = 'reset_password';
                 form.appendChild(actionInput);
                 
                 var userIdInput = document.createElement('input');

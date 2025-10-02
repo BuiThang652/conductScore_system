@@ -2,47 +2,32 @@
 /**
  * TRANG CHỦ - index.php
  * 
- * Đây là trang chính sau khi user đăng nhập     <!--                <?php if ($user_role === 'student'): ?>
-                    <li><a href="students.php">📝 Tự đánh giá</a></li>
-                    <li><a href="evaluations.php">📊 Xem kết quả</a></li>
-                <?php else: ?>
-                    <li><a href="students.php">👨‍🎓 Quản lý sinh viên</a></li>
-                    <li><a href="evaluations.php">📊 Điểm rèn luyện</a></li>ĐIỀU HƯỚNG -->
-    <nav class="nav-menu">
-        <div class="container">
-            <ul class="menu-list">
-                <li><a href="index.php" class="active">🏠 Trang chủ</a></li>
-                <?php if ($user_role === 'student'): ?>
-                    <li><a href="students.php">📝 Tự đánh giá</a></li>
-                    <li><a href="evaluations.php">📊 Xem kết quả</a></li>
-                <?php else: ?>
-                    <li><a href="students.php">👨‍🎓 Quản lý sinh viên</a></li>
-                    <li><a href="evaluations.php">📊 Điểm rèn luyện</a></li>
-                    <?php if ($user_role === 'admin'): ?>
-                        <li><a href="admin.php">⚙️ Quản trị</a></li>
-                    <?php endif; ?>
-                <?php endif; ?>Hiển thị menu và thông tin cơ bản
+ * Chức năng:
+ * - Hiển thị trang chính sau khi user đăng nhập
+ * - Hiển thị thông tin user (tên, role)
+ * - Hiển thị menu điều hướng theo role
+ * - Hiển thị thống kê cơ bản
  */
 
-// Bắt đầu session
+// 1. BẮT ĐẦU SESSION
 session_start();
 
-// Include file kết nối database
+// 2. KẾT NỐI DATABASE
 require_once 'config.php';
 
-// KIỂM TRA ĐĂNG NHẬP
+// 3. KIỂM TRA ĐĂNG NHẬP
 if (!isset($_SESSION['user_id'])) {
     // Nếu chưa đăng nhập thì chuyển về trang login
     header('Location: login.php');
     exit;
 }
 
-// Lấy thông tin user từ session
-$user_name = $_SESSION['user_name'];
-$user_role = $_SESSION['user_role'];
-$user_email = $_SESSION['user_email'];
+// 4. LẤY THÔNG TIN USER TỪ SESSION
+$user_name = $_SESSION['user_name'];    // Tên user đã đăng nhập
+$user_role = $_SESSION['user_role'];    // Role: student, lecturer, admin
+$user_email = $_SESSION['user_email'];  // Email của user
 
-// XỬ LÝ ĐĂNG XUẤT
+// 5. XỬ LÝ ĐĂNG XUẤT
 if (isset($_GET['logout'])) {
     // Xóa hết session
     session_destroy();

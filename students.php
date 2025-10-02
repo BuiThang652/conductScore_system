@@ -111,19 +111,22 @@ if (!empty($term_id) && $current_student) {
         ");
         $all_criteria = $criteria_stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Phân loại tiêu chí
-        $parent_criteria = [];
-        $child_criteria = [];
+        // Phân loại tiêu chí thành 2 nhóm: tiêu chí chính và tiêu chí con
+        $main_criteria_list = array();      // Danh sách tiêu chí chính (không có parent)
+        $sub_criteria_list = array();       // Danh sách tiêu chí con (có parent)
         
-        foreach ($all_criteria as $criterion) {
-            if (empty($criterion['parent_id'])) {
-                $parent_criteria[] = $criterion;
+        foreach ($all_criteria as $single_criterion) {
+            if (empty($single_criterion['parent_id'])) {
+                // Đây là tiêu chí chính (không có parent)
+                $main_criteria_list[] = $single_criterion;
             } else {
-                $child_criteria[$criterion['parent_id']][] = $criterion;
+                // Đây là tiêu chí con (có parent), nhóm theo parent_id
+                $sub_criteria_list[$single_criterion['parent_id']][] = $single_criterion;
             }
         }
         
-        $criteria = ['parent' => $parent_criteria, 'child' => $child_criteria];
+        // Tạo mảng tổng hợp để dễ sử dụng trong template
+        $criteria = array('parent' => $main_criteria_list, 'child' => $sub_criteria_list);
         
         // Lấy đánh giá của sinh viên trong kỳ này
         $eval_stmt = $pdo->prepare("
@@ -167,43 +170,75 @@ if (!empty($term_id) && $current_student) {
     }
 }
 
-// XỬ LÝ LƯU ĐIỂM ĐÁNH GIÁ
+/**
+ * HÀM XÓA ĐIỂM ĐÁNH GIÁ CŨ
+ * Xóa tất cả điểm cũ của một đánh giá để chuẩn bị lưu điểm mới
+ */
+function deleteOldEvaluationScores($pdo, $evaluation_id) {
+    $delete_stmt = $pdo->prepare("DELETE FROM evaluation_items WHERE evaluation_id = ?");
+    return $delete_stmt->execute([$evaluation_id]);
+}
+
+/**
+ * HÀM LƯU ĐIỂM ĐÁNH GIÁ MỚI
+ * Lưu từng điểm đánh giá của sinh viên vào database
+ */
+function saveNewEvaluationScores($pdo, $evaluation_id, $scores_data, $notes_data) {
+    $insert_stmt = $pdo->prepare("
+        INSERT INTO evaluation_items (evaluation_id, criterion_id, self_score, note) 
+        VALUES (?, ?, ?, ?)
+    ");
+    
+    // Lặp qua từng tiêu chí để lưu điểm
+    foreach ($scores_data as $criterion_id => $score_value) {
+        $score_value = (float)$score_value;  // Chuyển thành số thực
+        $note_text = isset($notes_data[$criterion_id]) ? trim($notes_data[$criterion_id]) : '';
+        
+        // Thực hiện lưu từng record
+        $insert_stmt->execute([$evaluation_id, $criterion_id, $score_value, $note_text]);
+    }
+    
+    return true;
+}
+
+/**
+ * HÀM CẬP NHẬT TRẠNG THÁI ĐÁNH GIÁ
+ * Đổi status từ 'draft' thành 'submitted' và cập nhật thời gian
+ */
+function updateEvaluationStatus($pdo, $evaluation_id, $new_status = 'submitted') {
+    $update_eval_stmt = $pdo->prepare("
+        UPDATE evaluations 
+        SET status = ?, updated_at = NOW() 
+        WHERE id = ?
+    ");
+    return $update_eval_stmt->execute([$new_status, $evaluation_id]);
+}
+
+// XỬ LÝ LƯU ĐIỂM ĐÁNH GIÁ (LOGIC CHÍNH)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_evaluation']) && $evaluation) {
     try {
+        // BƯỚC 1: Bắt đầu transaction (để rollback nếu có lỗi)
         $pdo->beginTransaction();
         
-        // Xóa các điểm cũ
-        $delete_stmt = $pdo->prepare("DELETE FROM evaluation_items WHERE evaluation_id = ?");
-        $delete_stmt->execute([$evaluation['id']]);
+        // BƯỚC 2: Xóa điểm cũ (nếu có)
+        deleteOldEvaluationScores($pdo, $evaluation['id']);
         
-        // Lưu điểm mới cho từng tiêu chí
-        foreach ($_POST['scores'] as $criterion_id => $score) {
-            $score = (float)$score;
-            
-            $insert_stmt = $pdo->prepare("
-                INSERT INTO evaluation_items (evaluation_id, criterion_id, self_score, note) 
-                VALUES (?, ?, ?, ?)
-            ");
-            $note = isset($_POST['notes'][$criterion_id]) ? trim($_POST['notes'][$criterion_id]) : '';
-            $insert_stmt->execute([$evaluation['id'], $criterion_id, $score, $note]);
-        }
+        // BƯỚC 3: Lưu điểm mới từ form
+        saveNewEvaluationScores($pdo, $evaluation['id'], $_POST['scores'], $_POST['notes']);
         
-        // Cập nhật trạng thái đánh giá
-        $update_eval_stmt = $pdo->prepare("
-            UPDATE evaluations 
-            SET status = 'submitted', updated_at = NOW() 
-            WHERE id = ?
-        ");
-        $update_eval_stmt->execute([$evaluation['id']]);
+        // BƯỚC 4: Cập nhật trạng thái đánh giá
+        updateEvaluationStatus($pdo, $evaluation['id'], 'submitted');
         
+        // BƯỚC 5: Commit transaction (lưu thay đổi vào database)
         $pdo->commit();
         $success_message = "✅ Đã lưu điểm tự đánh giá thành công!";
         
-        // Reload dữ liệu
+        // BƯỚC 6: Reload trang để hiển thị dữ liệu mới
         header("Location: students.php?term_id=$term_id&saved=1");
         exit;
         
     } catch (PDOException $e) {
+        // Nếu có lỗi thì rollback (hủy tất cả thay đổi)
         $pdo->rollback();
         $error_message = "Lỗi lưu điểm: " . $e->getMessage();
     }
@@ -335,51 +370,53 @@ if (isset($_GET['saved'])) {
                             
                             <?php 
                             $total_max_score = 0;
-                            foreach ($criteria['parent'] as $parent): 
-                                $parent_max = 0;
-                                if (isset($criteria['child'][$parent['id']])) {
-                                    foreach ($criteria['child'][$parent['id']] as $child) {
-                                        $parent_max += $child['max_point'];
+                            // Lặp qua từng tiêu chí chính để hiển thị form
+                            foreach ($criteria['parent'] as $main_criterion): 
+                                $main_criterion_max_score = 0;
+                                // Tính tổng điểm tối đa của nhóm này bằng cách cộng điểm các tiêu chí con
+                                if (isset($criteria['child'][$main_criterion['id']])) {
+                                    foreach ($criteria['child'][$main_criterion['id']] as $sub_criterion) {
+                                        $main_criterion_max_score += $sub_criterion['max_point'];
                                     }
                                 }
-                                $total_max_score += $parent_max;
+                                $total_max_score += $main_criterion_max_score;
                             ?>
                                 <div class="criteria-group">
                                     <div class="criteria-header">
-                                        <h4><?php echo htmlspecialchars($parent['name']); ?></h4>
+                                        <h4><?php echo htmlspecialchars($main_criterion['name']); ?></h4>
                                         <div class="group-score">
-                                            <span class="current-group-score">0</span> / <span class="max-group-score"><?php echo $parent_max; ?></span> điểm
+                                            <span class="current-group-score">0</span> / <span class="max-group-score"><?php echo $main_criterion_max_score; ?></span> điểm
                                         </div>
                                     </div>
                                     
-                                    <?php if (isset($criteria['child'][$parent['id']])): ?>
-                                        <?php foreach ($criteria['child'][$parent['id']] as $child): ?>
+                                    <?php if (isset($criteria['child'][$main_criterion['id']])): ?>
+                                        <?php foreach ($criteria['child'][$main_criterion['id']] as $sub_criterion): ?>
                                             <div class="criteria-item">
                                                 <div class="criteria-info">
-                                                    <label for="score_<?php echo $child['id']; ?>">
-                                                        <?php echo htmlspecialchars($child['name']); ?>
-                                                        <span class="max-point">Max: <?php echo $child['max_point']; ?> điểm</span>
+                                                    <label for="score_<?php echo $sub_criterion['id']; ?>">
+                                                        <?php echo htmlspecialchars($sub_criterion['name']); ?>
+                                                        <span class="max-point">Max: <?php echo $sub_criterion['max_point']; ?> điểm</span>
                                                     </label>
                                                 </div>
                                                 <div class="input-group">
                                                     <div class="score-input">
                                                         <input type="number" 
-                                                               id="score_<?php echo $child['id']; ?>"
-                                                               name="scores[<?php echo $child['id']; ?>]" 
+                                                               id="score_<?php echo $sub_criterion['id']; ?>"
+                                                               name="scores[<?php echo $sub_criterion['id']; ?>]" 
                                                                class="score-field"
-                                                               data-max="<?php echo $child['max_point']; ?>"
+                                                               data-max="<?php echo $sub_criterion['max_point']; ?>"
                                                                min="0" 
-                                                               max="<?php echo $child['max_point']; ?>" 
+                                                               max="<?php echo $sub_criterion['max_point']; ?>" 
                                                                step="0.1"
-                                                               value="<?php echo isset($evaluation_items[$child['id']]) ? $evaluation_items[$child['id']]['self_score'] : '0'; ?>"
+                                                               value="<?php echo isset($evaluation_items[$sub_criterion['id']]) ? $evaluation_items[$sub_criterion['id']]['self_score'] : '0'; ?>"
                                                                placeholder="0"
                                                                oninput="updateScores()"
                                                                required>
                                                         <span class="input-suffix">điểm</span>
                                                     </div>
-                                                    <textarea name="notes[<?php echo $child['id']; ?>]" 
+                                                    <textarea name="notes[<?php echo $sub_criterion['id']; ?>]" 
                                                               class="note-field"
-                                                              placeholder="📝 Ghi chú, minh chứng, hoạt động cụ thể..."><?php echo isset($evaluation_items[$child['id']]) ? htmlspecialchars($evaluation_items[$child['id']]['note']) : ''; ?></textarea>
+                                                              placeholder="📝 Ghi chú, minh chứng, hoạt động cụ thể..."><?php echo isset($evaluation_items[$sub_criterion['id']]) ? htmlspecialchars($evaluation_items[$sub_criterion['id']]['note']) : ''; ?></textarea>
                                                 </div>
                                             </div>
                                         <?php endforeach; ?>
@@ -556,3 +593,20 @@ if (isset($_GET['saved'])) {
 
 </body>
 </html>
+
+<?php
+/**
+ * GIẢI THÍCH CODE CHO NGƯỜI MỚI:
+ * 
+ * 1. session_start(): Tiếp tục session đăng nhập
+ * 2. PDO::prepare(): Chuẩn bị câu lệnh SQL an toàn (tránh SQL injection)
+ * 3. fetchAll(PDO::FETCH_ASSOC): Lấy dữ liệu dạng mảng associative
+ * 4. transaction (beginTransaction/commit/rollback): Đảm bảo tính toàn vẹn dữ liệu
+ * 5. htmlspecialchars(): Bảo vệ khỏi XSS khi hiển thị dữ liệu
+ * 6. isset(): Kiểm tra biến có tồn tại không
+ * 7. $_POST/$_GET: Nhận dữ liệu từ form và URL
+ * 8. JavaScript validation: Kiểm tra dữ liệu trước khi submit
+ * 9. prepared statements: Sử dụng placeholder (?) để bảo mật
+ * 10. foreign key: Liên kết giữa các bảng (student_id, term_id, criterion_id)
+ */
+?>
